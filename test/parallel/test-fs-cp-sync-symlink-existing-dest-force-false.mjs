@@ -101,3 +101,19 @@ for (const { create, read, expected } of Object.values(existing)) {
   cpSync(src, dest, { recursive: true, filter: () => true });
   assert.strictEqual(realpathSync(destLink), realpathSync(srcTarget));
 }
+
+// Without a filter, cpSync() copies the directory in C++.
+for (const { create, read, expected } of Object.values(existing)) {
+  for (const verbatimSymlinks of [false, true]) {
+    const { src, dest, destLink } = makeDirs(create);
+    const opts = { force: false, recursive: true, verbatimSymlinks };
+    cpSync(src, dest, mustNotMutateObjectDeep(opts));
+    assert.strictEqual(read(destLink), expected);
+  }
+}
+
+{
+  const { src, dest, destLink } = makeDirs((path) => symlinkSync(destTarget, path));
+  cpSync(src, dest, mustNotMutateObjectDeep({ recursive: true }));
+  assert.strictEqual(realpathSync(destLink), realpathSync(srcTarget));
+}
