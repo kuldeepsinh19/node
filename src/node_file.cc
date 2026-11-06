@@ -4961,6 +4961,26 @@ CpError CopyDirRecursive(const std::filesystem::path& src_path,
       }
 
       if (is_symlink && !options.dereference) {
+        // Like a file, an existing destination is only replaced when force is
+        // set. symlink_status() does not follow a link already there, so a
+        // dangling one counts as existing, as with lstat() in the JS walk.
+        if (!options.force) {
+          std::error_code dest_error;
+          if (std::filesystem::exists(std::filesystem::symlink_status(
+                  dest_file_path, dest_error))) {
+            if (options.error_on_exist) {
+              return {CpError::kEexist,
+                      0,
+                      "cp",
+                      SPrintF("[ERR_FS_CP_EEXIST]: Target already exists: "
+                              "cp returned EEXIST (%s already exists)",
+                              dest_file_path),
+                      {}};
+            }
+            continue;
+          }
+        }
+
         if (options.verbatim_symlinks) {
           std::filesystem::copy_symlink(
               dir_entry.path(), dest_file_path, error);
@@ -5008,9 +5028,6 @@ CpError CopyDirRecursive(const std::filesystem::path& src_path,
                         {}};
               }
 
-              // symlinks get overridden by cp even if force: false, this is
-              // being applied here for backward compatibility, but is it
-              // correct? or is it a bug?
               std::filesystem::remove(dest_file_path, error);
               if (error) {
                 return CpError::Std(error, dest_str);
